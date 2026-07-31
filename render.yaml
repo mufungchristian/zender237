@@ -1,0 +1,79 @@
+# Render Blueprint — Zender237 Full Stack Application
+# Docs: https://render.com/docs/blueprint-spec
+#
+# This blueprint deploys TWO web services:
+#   1. A Node.js backend API   (zender237-backend)  — Express + TypeScript (port 8090)
+#   2. A static frontend site   (zender237-frontend) — React + Vite build
+#
+# The backend connects to your EXTERNAL PostgreSQL database (e.g. Neon)
+# via the DATABASE_URL environment variable, which Render will prompt
+# you to enter during Blueprint creation (because it has `sync: false`).
+#
+# After the first deploy, the backend auto-runs `npm run migrate` (creates tables)
+# and `initialDeployHook` runs `npm run seed` (inserts demo users/numbers/rates).
+#
+# During Blueprint creation, Render will PROMPT you for these secret values
+# (they all have `sync: false`):
+#   - DATABASE_URL            (your Neon / external PostgreSQL connection string)
+#   - FIREBASE_PROJECT_ID
+#   - FIREBASE_CLIENT_EMAIL
+#   - FIREBASE_PRIVATE_KEY
+#   - FIREBASE_STORAGE_BUCKET
+# Copy them from your local backend/.env file.
+
+services:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Backend — Node.js + Express + TypeScript API  (Node 20.x, pinned via engines)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - type: web
+    name: zender237-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm run migrate && npm start
+    healthCheckPath: /health
+    initialDeployHook: npm run seed
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8090
+      # PostgreSQL connection string — Render PROMPTS for this on first sync.
+      # Paste your Neon (or other external Postgres) URL here, e.g.:
+      # postgresql://user:pass@host/db?sslmode=require
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_WHATSAPP
+        value: "+237700000001"
+      # ── Firebase Admin SDK — Render prompts for these on first blueprint sync ──
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: FIREBASE_STORAGE_BUCKET
+        sync: false
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Frontend — React static site (Vite build, served by Render Static Sites)
+  # NOTE: `runtime: static` is a free Static Site — do NOT set a `plan` field.
+  # ─────────────────────────────────────────────────────────────────────────────
+  - type: web
+    name: zender237-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    pullRequestPreviewsEnabled: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # IMPORTANT: the value MUST end with /api
+      # (the API client prepends this base URL to every endpoint path)
+      - key: VITE_API_URL
+        value: https://zender237-backend.onrender.com/api
